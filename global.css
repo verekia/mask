@@ -1,0 +1,537 @@
+@import 'tailwindcss';
+
+@theme {
+  --color-bg-0: #1a1a1a;
+  --color-bg-1: #222;
+  --color-bg-2: #2a2a2a;
+  --color-bg-3: #1b1b1b;
+  --color-line: #333;
+  --color-line-2: #444;
+  --color-line-strong: #555;
+  --color-text: #e0e0e0;
+  --color-text-bright: #f0f0f0;
+  --color-muted: #ccc;
+  --color-muted-2: #aaa;
+  --color-muted-3: #888;
+  --color-muted-4: #999;
+  --color-accent: #88aaff;
+  --color-accent-bg: #2a4a6a;
+  --color-error-bg: #3a1a1a;
+  --color-error-border: #663333;
+  --color-error: #ff8888;
+}
+
+@layer base {
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    background: var(--color-bg-0);
+    color: var(--color-text);
+    min-height: 100vh;
+    margin: 0;
+  }
+
+  h1 {
+    font-size: 1.5rem;
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+    color: var(--color-text-bright);
+  }
+
+  h2 {
+    font-size: 1rem;
+    font-weight: 500;
+    margin-bottom: 0.75rem;
+    color: var(--color-muted);
+  }
+
+  canvas {
+    display: block;
+    border: 1px solid var(--color-line);
+    border-radius: 4px;
+    height: auto;
+  }
+
+  button {
+    margin-top: 1rem;
+    padding: 0.5rem 1.25rem;
+    background: #333;
+    color: #ddd;
+    border: 1px solid var(--color-line-strong);
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.85rem;
+    transition: background-color 0.15s;
+  }
+
+  button:hover {
+    background: #444;
+  }
+
+  section {
+    margin-top: 2rem;
+  }
+}
+
+@layer components {
+  #app {
+    max-width: 1600px;
+    margin: 0 auto;
+    padding: 2rem 1.5rem 2rem;
+  }
+
+  .intro {
+    max-width: 760px;
+    margin-bottom: 1.5rem;
+    color: var(--color-muted-2);
+    font-size: 0.9rem;
+    line-height: 1.5;
+  }
+  .intro b {
+    color: var(--color-muted);
+  }
+
+  .hidden {
+    display: none !important;
+  }
+
+  /* Drop zone */
+  .drop-zone {
+    width: 256px;
+    min-width: 256px;
+    height: 256px;
+    border: 2px dashed var(--color-line-strong);
+    border-radius: 8px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: border-color 0.15s;
+    position: relative;
+  }
+  .drop-zone:hover,
+  .drop-zone.drag-over {
+    border-color: var(--color-accent);
+  }
+  .drop-zone p {
+    font-size: 0.85rem;
+    color: var(--color-muted-4);
+    pointer-events: none;
+    text-align: center;
+    padding: 0 1rem;
+  }
+  .file-input {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    cursor: pointer;
+  }
+
+  .header-bar {
+    display: flex;
+    gap: 2rem;
+    align-items: flex-start;
+    justify-content: space-between;
+    flex-wrap: wrap;
+  }
+  /* Left column: title, intro, and the config buttons under it. */
+  .header-main {
+    flex: 1 1 420px;
+    min-width: 0;
+  }
+  .header-main .config-bar {
+    margin-top: 0.25rem;
+  }
+  /* Right column: the three input slots, level with the title. */
+  .header-textures {
+    display: flex;
+    gap: 1.5rem;
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+
+  /* The editor: a scrolling sidebar of dials + a sticky viewport that holds focus
+     while you scroll. */
+  .stage {
+    display: grid;
+    grid-template-columns: 300px minmax(0, 1fr);
+    gap: 2rem;
+    align-items: start;
+    margin-top: 2.5rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--color-line);
+  }
+  .stage-controls {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    min-width: 0;
+  }
+  .stage-preview {
+    position: sticky;
+    top: 1rem;
+    align-self: start;
+    min-width: 0;
+  }
+  .stage-preview-inner {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+  }
+
+  #error-message {
+    margin-top: 1rem;
+    padding: 0.75rem 1rem;
+    background: var(--color-error-bg);
+    border: 1px solid var(--color-error-border);
+    border-radius: 6px;
+    color: var(--color-error);
+  }
+
+  .status {
+    margin-top: 0.5rem;
+    font-size: 0.8rem;
+    color: var(--color-muted-3);
+    font-variant-numeric: tabular-nums;
+    min-height: 1.1em;
+  }
+
+  /* Control groups — stacked vertically in the sidebar */
+  .control-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.7rem;
+    padding: 0.75rem 0.85rem;
+    background: var(--color-bg-1);
+    border: 1px solid var(--color-line);
+    border-radius: 6px;
+  }
+  .control-group-title {
+    font-size: 0.72rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--color-muted-3);
+  }
+  /* Group title row with a control (the On/Off toggle) pinned to the right. */
+  .control-group-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+  }
+  /* Each slider row: name + value on top, full-width slider below. */
+  .control-group label {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: center;
+    column-gap: 0.5rem;
+    row-gap: 0.3rem;
+    font-size: 0.8rem;
+    color: var(--color-muted);
+  }
+  .control-group label[title] .control-label {
+    text-decoration: underline dashed #666;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 3px;
+    cursor: help;
+  }
+  .control-label {
+    min-width: 0;
+  }
+  .control-group input[type='range'] {
+    grid-column: 1 / -1;
+    width: 100%;
+  }
+  .control-value {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    color: var(--color-muted-2);
+  }
+
+  /* Compact On/Off label pinned to the right of a group title. */
+  .group-toggle {
+    margin-top: 0;
+    padding: 0.1rem 0.5rem;
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    border-radius: 4px;
+    border: 1px solid var(--color-line-strong);
+    background: var(--color-bg-2);
+    color: var(--color-muted-3);
+  }
+  .group-toggle[aria-pressed='true'] {
+    background: var(--color-accent-bg);
+    border-color: var(--color-accent);
+    color: #fff;
+  }
+
+  /* Radio groups (mutually-exclusive choices) — the checked dot shows selection. */
+  .radio-group {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem 1.1rem;
+  }
+  .control-group .radio-group label {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.82rem;
+    color: var(--color-muted);
+    cursor: pointer;
+  }
+  .radio-group input[type='radio'] {
+    margin: 0;
+    accent-color: var(--color-accent);
+    cursor: pointer;
+  }
+
+  /* Config bar */
+  .config-bar {
+    display: inline-flex;
+    gap: 0.5rem;
+    align-items: center;
+  }
+
+  /* Compact segmented control — radio inputs styled as small buttons (the zoom picker). */
+  .seg {
+    gap: 0.25rem;
+  }
+  .seg label {
+    padding: 0.1rem 0.4rem;
+    font-size: 0.7rem;
+    font-weight: 600;
+    border: 1px solid var(--color-line-strong);
+    border-radius: 4px;
+    background: var(--color-bg-2);
+    color: var(--color-muted-3);
+    cursor: pointer;
+  }
+  .seg input[type='radio'] {
+    display: none;
+  }
+  .seg label:has(input:checked) {
+    background: var(--color-accent-bg);
+    border-color: var(--color-accent);
+    color: #fff;
+  }
+  .text-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    margin-top: 0;
+    padding: 0.25rem 0.6rem;
+    font-size: 0.75rem;
+    color: #ddd;
+    text-decoration: none;
+    cursor: pointer;
+    background: var(--color-bg-2);
+    border: 1px solid var(--color-line-strong);
+    border-radius: 5px;
+  }
+  .text-btn:hover {
+    background: #444;
+  }
+  .offscreen-input {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  .dl-badge-arrow {
+    width: 12px;
+    height: 12px;
+  }
+
+  /* Input slots — Source / Modified / Mask, each a small drop zone that shows its image. */
+  .slot {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+  }
+  .slot-label {
+    font-size: 0.72rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--color-muted-3);
+  }
+  .slot-zone {
+    width: 176px;
+    min-width: 176px;
+    height: 120px;
+  }
+  .slot-zone.filled {
+    border-style: solid;
+    border-color: var(--color-line-2);
+    background: var(--color-bg-3);
+  }
+  .slot-zone.filled:hover,
+  .slot-zone.drag-over,
+  body.dragging .slot-zone {
+    border-color: var(--color-accent);
+  }
+  .slot-thumb {
+    border: none;
+    border-radius: 2px;
+    pointer-events: none;
+  }
+  #slot-mask-thumb {
+    background: #3a3a3a;
+  }
+
+  .button-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+  }
+
+  /* Toolbar above the viewport: compare toggle, view picker, overlay picker, zoom, download. */
+  .toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.6rem 1rem;
+  }
+  .toolbar-group {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+  }
+  .toolbar-end {
+    margin-left: auto;
+  }
+  .toolbar-label {
+    font-size: 0.72rem;
+    color: var(--color-muted-3);
+  }
+  .zoom-value {
+    min-width: 3.2em;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+  .compare-btn {
+    margin-top: 0;
+    min-width: 6.5rem;
+    padding: 0.35rem 0.9rem;
+    font-size: 0.8rem;
+    font-weight: 600;
+  }
+  .compare-btn[aria-pressed='true'] {
+    background: var(--color-accent-bg);
+    border-color: var(--color-accent);
+    color: #fff;
+  }
+
+  /* Editor viewport: the stacked full-resolution canvases, zoomed and panned by transform. */
+  .viewport {
+    position: relative;
+    /* Toolbar + viewport + status fit the window under the sticky offset and the page padding. */
+    height: calc(100vh - 8rem);
+    min-height: 360px;
+    overflow: hidden;
+    border: 1px solid var(--color-line);
+    border-radius: 4px;
+    background: #141414;
+    cursor: crosshair;
+    touch-action: none;
+    user-select: none;
+  }
+  .viewport.pan-ready {
+    cursor: grab;
+  }
+  .viewport.panning {
+    cursor: grabbing;
+  }
+  .viewport-content {
+    position: absolute;
+    top: 0;
+    left: 0;
+    transform-origin: 0 0;
+  }
+  .viewport-content canvas {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    border: none;
+    border-radius: 0;
+  }
+  .viewport-content.pixelated canvas {
+    image-rendering: pixelated;
+  }
+  .mask-layer {
+    opacity: 0.45;
+    pointer-events: none;
+  }
+  /* The paint layer always shows while a stroke is in progress. */
+  .viewport.painting #canvas-mask {
+    display: block !important;
+  }
+  .brush-cursor {
+    position: absolute;
+    top: 0;
+    left: 0;
+    border: 1px solid #fff;
+    border-radius: 50%;
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.6);
+    pointer-events: none;
+  }
+  .brush-cursor.erasing {
+    border-style: dashed;
+  }
+  .viewport.pan-ready .brush-cursor,
+  .viewport.panning .brush-cursor {
+    display: none;
+  }
+  /* Which image is on screen — the compare toggle flips it in place. */
+  .view-badge {
+    position: absolute;
+    top: 8px;
+    left: 8px;
+    padding: 0.25rem 0.55rem;
+    background: rgba(20, 20, 20, 0.78);
+    color: #e8e8e8;
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    border-radius: 5px;
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+    pointer-events: none;
+  }
+  .view-badge[data-view='source'] {
+    color: #ffd479;
+    border-color: rgba(255, 212, 121, 0.5);
+  }
+  .view-badge[data-view='modified'] {
+    color: #9ece6a;
+    border-color: rgba(158, 206, 106, 0.5);
+  }
+
+  .status-row {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 0.25rem 1rem;
+  }
+  .status-row .status {
+    margin-top: 0;
+  }
+  .status.hint {
+    color: #666;
+  }
+
+  /* Narrow screens: stack the sidebar above a non-sticky preview. */
+  @media (max-width: 820px) {
+    .stage {
+      grid-template-columns: 1fr;
+    }
+    .stage-preview {
+      position: static;
+    }
+  }
+}
