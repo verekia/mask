@@ -197,6 +197,51 @@ export const MainView = () => {
             </div>
 
             <div className="control-group">
+              <div className="control-group-head">
+                <span className="control-group-title">Change gate</span>
+                <button
+                  id="btn-gate-toggle"
+                  className="group-toggle"
+                  type="button"
+                  aria-pressed="false"
+                  title="Inside the mask, only let through pixels where the color-matched modified image differs strongly from the source — new red lips, a cloud of a different shape. Subtle drifts (a slightly lighter skin, a re-tinted sky) stay source. Best for a distinct shape over a background of a different color; leave it off to replace a whole area. The Blend overlay shows what passes."
+                >
+                  Off
+                </button>
+              </div>
+              <Slider
+                id="gate-threshold"
+                label="Threshold"
+                min={1}
+                max={40}
+                step={1}
+                defaultValue={8}
+                display="8"
+                title="Perceptual color difference (Oklab ΔE × 100) below which a modified pixel is ignored and the source kept. Raise it to drop more drift; lower it to let subtler changes through."
+              />
+              <Slider
+                id="gate-spread"
+                label="Spread"
+                min={0}
+                max={16}
+                step={1}
+                defaultValue={2}
+                display="2 px"
+                title="Grow the passed areas by this much, then soften them, so the anti-aliased rims of changed shapes come along."
+              />
+              <Slider
+                id="gate-drift"
+                label="Drift"
+                min={0}
+                max={6}
+                step={1}
+                defaultValue={2}
+                display="2 px"
+                title="Misalignment to forgive: a color found this close in the other image counts as the same thing moved, not a change — so outlines that merely shifted a pixel or two stay source."
+              />
+            </div>
+
+            <div className="control-group">
               <span className="control-group-title">Color</span>
               <Slider
                 id="global-match"

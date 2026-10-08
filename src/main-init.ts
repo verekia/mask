@@ -104,6 +104,8 @@ function setRadio(name: string, value: string) {
 type SliderDef = { id: string; format: (v: number) => string; apply: (v: number) => void }
 /** A set of radio inputs sharing `name`. `persist` ones are saved in the config. */
 type RadioDef = { name: string; persist?: boolean; apply: (value: string) => void }
+/** A single on/off toggle button (shows "On"/"Off"). `key` is the config key. */
+type SwitchDef = { id: string; key: string; apply: (on: boolean) => void }
 
 export function init() {
   if (initialized) return
@@ -139,6 +141,12 @@ export function init() {
 
   const opts: BlendOptions = { ...DEFAULT_BLEND_OPTIONS }
   const offset = { dx: 0, dy: 0 }
+  // The gate's threshold dial keeps its value while the gate is off (threshold 0 disables it).
+  const gate = { on: false, threshold: 0.08 }
+  const applyGate = () => {
+    opts.changeThreshold = gate.on ? gate.threshold : 0
+    scheduleBlend()
+  }
 
   // --- Errors / status ---
 
@@ -420,6 +428,16 @@ export function init() {
     blendSlider('grow', ' px', v => (opts.grow = v)),
     blendSlider('feather', ' px', v => (opts.feather = v)),
     blendSlider('detail-seam', ' px', v => (opts.detailSeam = v)),
+    {
+      id: 'gate-threshold',
+      format: v => `${v}`,
+      apply: v => {
+        gate.threshold = v / 100
+        applyGate()
+      },
+    },
+    blendSlider('gate-spread', ' px', v => (opts.changeSpread = v)),
+    blendSlider('gate-drift', ' px', v => (opts.changeJitter = v)),
     blendSlider('global-match', '%', v => (opts.globalMatch = v / 100)),
     blendSlider('local-match', '%', v => (opts.localMatch = v / 100)),
     blendSlider('local-radius', ' px', v => (opts.localRadius = v)),
@@ -462,6 +480,25 @@ export function init() {
     },
   ]
 
+  const switches: SwitchDef[] = [
+    {
+      id: 'btn-gate-toggle',
+      key: 'gate-enabled',
+      apply: on => {
+        gate.on = on
+        applyGate()
+      },
+    },
+  ]
+
+  const switchOn = (s: SwitchDef) => $(s.id).getAttribute('aria-pressed') === 'true'
+
+  function setSwitch(s: SwitchDef, on: boolean) {
+    const btn = $(s.id)
+    btn.setAttribute('aria-pressed', String(on))
+    btn.textContent = on ? 'On' : 'Off'
+  }
+
   function setSlider(s: SliderDef, v: number) {
     const input = $(s.id) as HTMLInputElement
     input.value = String(v)
@@ -480,6 +517,7 @@ export function init() {
     const out: MaskSettings = {}
     for (const s of sliders) out[s.id] = +($(s.id) as HTMLInputElement).value
     for (const r of radios) if (r.persist) out[r.name] = radioValue(r.name)
+    for (const s of switches) out[s.key] = switchOn(s) ? 'on' : 'off'
     return out
   }
 
@@ -493,6 +531,13 @@ export function init() {
       if (r.persist && typeof v === 'string') {
         setRadio(r.name, v)
         r.apply(v)
+      }
+    }
+    for (const s of switches) {
+      const v = settings[s.key]
+      if (typeof v === 'string') {
+        setSwitch(s, v === 'on')
+        s.apply(v === 'on')
       }
     }
   }
@@ -632,5 +677,14 @@ export function init() {
       })
     }
     r.apply(radioValue(r.name))
+  }
+
+  for (const s of switches) {
+    $(s.id).addEventListener('click', () => {
+      const on = !switchOn(s)
+      setSwitch(s, on)
+      s.apply(on)
+    })
+    s.apply(switchOn(s))
   }
 }

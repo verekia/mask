@@ -41,7 +41,15 @@ All of it runs in a Web Worker, on padded boxes around each cluster of strokes.
    smoothed boundary so jittery edges don't streak into the patch.
 4. **Detail match** _(optional)_ — rescales the modified image's finest detail so its energy
    matches the source's around the mask, for when the edit came out softer or noisier.
-5. **Multi-band blend** — the difference is split into frequency bands (Burt–Adelson). Broad tone
+5. **Change gate** _(optional)_ — inside the mask, only pixels where the color-matched modified
+   image still differs strongly from the source (Oklab ΔE above **Threshold**) come through, so
+   you can paint loosely: over a mouth, only the new red lips pass and a slightly lighter skin
+   stays source; over a sky, a reshaped cloud swaps in while the blue stays put. A color found
+   within **Drift** px in the other image counts as the same thing moved, so outlines that merely
+   shifted stay source; **Spread** takes in the anti-aliased rims of changed shapes. Best for a
+   distinct shape over a background of a different color — leave it off to replace a whole area.
+   The **Blend** overlay shows what passes.
+6. **Multi-band blend** — the difference is split into frequency bands (Burt–Adelson). Broad tone
    cross-fades over the whole feather while fine detail switches over the narrow **Detail seam**,
    so edges that don't quite line up never show as ghosted doubles.
 

@@ -30,7 +30,9 @@ Next.js Pages Router, but it's really a vanilla-TS app: `pages/index.tsx` dynami
 - **`src/blend.ts`** — the CPU compositing pipeline (pure, no DOM), in three cacheable stages:
   `shapeMask` (clusters → padded regions, signed distance + adaptive feather) → `fitColorAffine`
   (robust global 3×4 color transform outside the mask) → `composite` (local tone membrane, detail
-  match, multi-band blend per region). `blend()` runs all three.
+  match, change gate, multi-band blend per region). `blend()` runs all three. The change gate is a
+  drift-tolerant Oklab difference matte that multiplies the blend weights, so it can only narrow
+  what the mask lets through.
 - **`src/blend.worker.ts`** — runs the pipeline off the main thread and caches the shape and color
   fit between requests. Every `blend` request gets exactly one reply (`result` / `skipped` /
   `error`); the main thread keeps one request in flight and coalesces the rest (latest wins).
@@ -38,7 +40,7 @@ Next.js Pages Router, but it's really a vanilla-TS app: `pages/index.tsx` dynami
 - **`src/editor.ts`** — the viewport: zoom/pan transform over the stacked full-resolution canvases,
   the brush (mask = red canvas, alpha = coverage), undo/redo.
 - **`src/config.ts`** — `.mask.json` (de)serialization for save/load.
-- **`src/main-init.ts`** — the glue. Owns a **control registry** (`sliders` / `radios`) that drives
+- **`src/main-init.ts`** — the glue. Owns a **control registry** (`sliders` / `radios` / `switches`) that drives
   DOM binding, value-label formatting, AND config save/load from one source of truth. Handles slot
   loading and drop routing, the worker, views and keyboard shortcuts.
 - **`src/MainView.tsx`** — static JSX markup only (controls, canvases). Control `id`s here must match

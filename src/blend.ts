@@ -13,7 +13,10 @@
 //    jittery edges don't bleed streaks into the patch).
 // 4. Detail match — optionally rescales the modified image's fine-detail energy to the
 //    source's (e.g. when the modified image came out softer).
-// 5. Multi-band blend (Burt–Adelson) — the difference is split into frequency bands;
+// 5. Change gate — optionally keeps the source wherever the color-matched modified image
+//    differs from it by less than a perceptual threshold (Oklab ΔE), so only real changes
+//    (new lips, a reshaped cloud) come through and subtle drifts never do.
+// 6. Multi-band blend (Burt–Adelson) — the difference is split into frequency bands;
 //    low frequencies cross-fade over the full feather while fine detail switches over
 //    a narrow seam, so slightly misaligned edges never show up as ghosted doubles.
 //
@@ -37,6 +40,12 @@ export interface BlendOptions {
   detailSeam: number
   /** 0..1 strength of matching the modified image's fine-detail energy to the source's. */
   detailMatch: number
+  /** Oklab ΔE (≈ 0..1) below which a modified pixel is ignored and the source kept. 0 disables the gate. */
+  changeThreshold: number
+  /** Pixels the change gate's matte is spread by, to take in the anti-aliased edges of changed shapes. */
+  changeSpread: number
+  /** Drift (px) the change gate forgives: a color found this close in the other image isn't a change. */
+  changeJitter: number
 }
 
 export const DEFAULT_BLEND_OPTIONS: BlendOptions = {
@@ -48,6 +57,9 @@ export const DEFAULT_BLEND_OPTIONS: BlendOptions = {
   tolerance: 0.08,
   detailSeam: 3,
   detailMatch: 0,
+  changeThreshold: 0,
+  changeSpread: 2,
+  changeJitter: 2,
 }
 
 export interface Images {
@@ -464,6 +476,93 @@ export function fitColorAffine(
   return A
 }
 
+// --- Change gate ---
+
+// sRGB → linear lookup over [0, 1]; 4096 steps is far finer than any threshold resolves.
+const LINEAR_LUT_SIZE = 4096
+const LINEAR_LUT = new Float32Array(LINEAR_LUT_SIZE + 1)
+for (let i = 0; i <= LINEAR_LUT_SIZE; i++) {
+  const v = i / LINEAR_LUT_SIZE
+  LINEAR_LUT[i] = v <= 0.04045 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4)
+}
+const toLinear = (v: number) => LINEAR_LUT[Math.round((v < 0 ? 0 : v > 1 ? 1 : v) * LINEAR_LUT_SIZE)]
+
+/** Oklab (Ottosson) of an sRGB color, written into out[0..2]. */
+function oklab(r: number, g: number, b: number, out: Float32Array): void {
+  const lr = toLinear(r)
+  const lg = toLinear(g)
+  const lb = toLinear(b)
+  const l = Math.cbrt(0.4122214708 * lr + 0.5363325363 * lg + 0.0514459929 * lb)
+  const m = Math.cbrt(0.2119034982 * lr + 0.6806995451 * lg + 0.1073969566 * lb)
+  const s = Math.cbrt(0.0883024619 * lr + 0.2817188376 * lg + 0.6299787005 * lb)
+  out[0] = 0.2104542553 * l + 0.793617785 * m - 0.0040720468 * s
+  out[1] = 1.9779984951 * l - 2.428592205 * m + 0.4505937099 * s
+  out[2] = 0.0259040371 * l + 0.7827717662 * m - 0.808675766 * s
+}
+
+/**
+ * Soft matte (0..1) of where M really differs from S. A pixel only counts as changed when its
+ * color can't be found within `jitter` px in the other image, checked both ways (Oklab ΔE) —
+ * so an edge that merely drifted a pixel or two finds its match and stays source, while new
+ * content (red lips on skin, a cloud over open sky) doesn't. The difference is ramped over
+ * threshold/2..threshold·1.5, spread so the anti-aliased rims of changed shapes come along,
+ * and softened.
+ */
+function changeGate(
+  S: Float32Array[],
+  M: Float32Array[],
+  w: number,
+  h: number,
+  threshold: number,
+  spread: number,
+  jitter: number,
+  tmp: Float32Array,
+): Float32Array {
+  const n = w * h
+  const lab = (P: Float32Array[]) => {
+    const L = [new Float32Array(n), new Float32Array(n), new Float32Array(n)]
+    const o = new Float32Array(3)
+    for (let k = 0; k < n; k++) {
+      oklab(P[0][k], P[1][k], P[2][k], o)
+      L[0][k] = o[0]
+      L[1][k] = o[1]
+      L[2][k] = o[2]
+    }
+    return L
+  }
+  const sl = lab(S)
+  const ml = lab(M)
+  const d = new Float32Array(n)
+  const nearest = (a: Float32Array[], b: Float32Array[], x: number, y: number) => {
+    const k = y * w + x
+    let best = Infinity
+    for (let dy = -jitter; dy <= jitter; dy++) {
+      const yy = y + dy
+      if (yy < 0 || yy >= h) continue
+      for (let dx = -jitter; dx <= jitter; dx++) {
+        const xx = x + dx
+        if (xx < 0 || xx >= w) continue
+        const j = yy * w + xx
+        const e0 = a[0][k] - b[0][j]
+        const e1 = a[1][k] - b[1][j]
+        const e2 = a[2][k] - b[2][j]
+        const dd = e0 * e0 + e1 * e1 + e2 * e2
+        if (dd < best) best = dd
+      }
+    }
+    return Math.sqrt(best)
+  }
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) d[y * w + x] = Math.max(nearest(ml, sl, x, y), nearest(sl, ml, x, y))
+  }
+  gaussBlur(d, w, h, 0.75, d, tmp)
+  let g: Float32Array = new Float32Array(n)
+  for (let k = 0; k < n; k++) g[k] = smoothstep(threshold * 0.5, threshold * 1.5, d[k])
+  if (spread >= 1) g = maxFilter(g, w, h, Math.round(spread))
+  gaussBlur(g, w, h, Math.max(0.5, spread / 2), g, tmp)
+  return g
+}
+
 // --- Regions ---
 
 /**
@@ -750,6 +849,12 @@ function blendRegion(
     lap('detail')
   }
 
+  const gate =
+    opts.changeThreshold > 0
+      ? changeGate(S, M, rw, rh, opts.changeThreshold, opts.changeSpread, opts.changeJitter, tmp)
+      : null
+  if (gate) lap('gate')
+
   // Multi-band blend of the difference Δ = M − S. Band k (≈ 2^k..2^(k+1) px) switches over
   // max(detailSeam, 2^(k+1)) px, centered in the adaptive feather. Bands whose widths are
   // equal telescope into one, so a plain cross-fade needs no blur at all.
@@ -774,7 +879,7 @@ function blendRegion(
       if (ei <= 0) continue
       const f = fe[i]
       const width = Math.min(f, bandWidth)
-      const wi = smoothstep((f - width) / 2, (f + width) / 2, ei)
+      const wi = smoothstep((f - width) / 2, (f + width) / 2, ei) * (gate ? gate[i] : 1)
       if (wi === 0) continue
       for (let c = 0; c < 3; c++) acc[c][i] += wi * (last ? low[c][i] : low[c][i] - next[c][i])
     }
@@ -796,7 +901,7 @@ function blendRegion(
       output[p] = Math.round((S[0][k] + acc[0][k]) * 255)
       output[p + 1] = Math.round((S[1][k] + acc[1][k]) * 255)
       output[p + 2] = Math.round((S[2][k] + acc[2][k]) * 255)
-      coverage[gidx] = Math.round(smoothstep(0, fe[k], e[k]) * 255)
+      coverage[gidx] = Math.round(smoothstep(0, fe[k], e[k]) * (gate ? gate[k] : 1) * 255)
     }
   }
   lap('composite')
