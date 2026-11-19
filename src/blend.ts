@@ -613,7 +613,7 @@ function clusterRegions(mask: Uint8Array, W: number, H: number, pad: number): Re
           ]),
         ]
       : boxes
-  for (let changed = true; changed; ) {
+  for (let changed = true; changed;) {
     changed = false
     const next: number[][] = []
     for (const b of merged) {
@@ -868,7 +868,7 @@ function blendRegion(
   let low = delta
   let next = M // M is no longer needed; reuse it as the low-pass buffer.
   const spare = planes()
-  for (let k = 0; k < widths.length; ) {
+  for (let k = 0; k < widths.length;) {
     let j = k
     while (j + 1 < widths.length && widths[j + 1] === widths[k]) j++
     const last = j === widths.length - 1

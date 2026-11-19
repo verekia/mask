@@ -17,9 +17,9 @@ bun install
 bun dev            # portless mask next dev (Next 16, Turbopack)
 bun run build      # static export (output: 'export')
 bun run all        # format:check + lint + typecheck + warden — run before considering work done
-bun run typecheck  # tsc --noEmit
+bun run typecheck  # bun check
 bun run lint       # oxlint .
-bun run format     # oxfmt . (auto-fix)
+bun run format     # bun fmt (auto-fix)
 ```
 
 ## Architecture
@@ -53,10 +53,10 @@ editor → worker (`blend`) → result + coverage canvases.
 ## Conventions & gotchas
 
 - **Warden** (`@verekia/warden`, run by `bun run all`) enforces shared config/versions across the
-  user's repos. Keep `next`/`react`/`typescript`/`oxfmt`/`oxlint`/etc. at their pinned versions and
+  user's repos. Keep `next`/`react`/`typescript`/`oxlint`/etc. at their pinned versions and
   keep the `format`/`lint`/`warden` scripts intact. **Avoid adding npm dependencies** — everything is
   doable with `react` + vanilla TS.
-- **Formatting/lint**: oxfmt (no semicolons, single quotes, 120 cols, trailing commas) + oxlint.
+- **Formatting/lint**: `bun fmt` (no semicolons, single quotes, 120 cols, trailing commas) + oxlint.
   `tsconfig` has `noUnusedLocals`/`noUnusedParameters`, so no unused imports/vars.
 - **Adding a control**: add the markup (with a unique `id`) in `MainView.tsx`, then one entry to the
   matching registry array in `main-init.ts`. That auto-wires the event handler, value label, and
@@ -73,5 +73,5 @@ editor → worker (`blend`) → result + coverage canvases.
   excludes `out` (otherwise the next `next build` type-checks the stray copy and fails). Import the
   message types from `worker-protocol.ts`, never from the worker module.
 - **JSX text**: in this toolchain the leading space of a multi-line JSX text node that follows an
-  inline element (`<b>x</b> more text…`) gets dropped, and oxfmt rewrites `{' '}` back to a plain
+  inline element (`<b>x</b> more text…`) gets dropped, and bun fmt rewrites `{' '}` back to a plain
   space. Use `&nbsp;` there.
